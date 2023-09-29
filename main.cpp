@@ -334,7 +334,7 @@ private:
             QString linux_path = file_path;
             QString windows_path = file_path;
             linux_path.replace("\\", "/");
-            QString liunx_filename = dictory + "/" + user_code + "/" + linux_path;
+            QString liunx_filename = dictory + "" + user_code + "/" + linux_path;
             QString windows_filename = dictory + "\\" + user_code + "\\" + windows_path;
             bool exists = QFile::exists(liunx_filename);
             if (!exists) {
@@ -343,20 +343,16 @@ private:
             qint64 file_size = get_file_size(liunx_filename);
             // 将文件大小转换为十六进制
             QString hex_string = "*" + calculate_crc32(liunx_filename);
-            qDebug() << hex_string;
+            qDebug() << liunx_filename;
             // 发送文件名
             QString message = QString("/%1/%2|%3%4\r\n").arg(user_code).arg(file_path).arg(file_size).arg(hex_string);
-            // 构建自定义协议数据包
-            QByteArray packet;
-            packet.append("SDFSDFA");
 
-            qDebug() << client_socket.write(message.toUtf8());
+            client_socket.write(message.toUtf8());
             if (!client_socket.waitForBytesWritten())
             {
                qDebug() << "Failed to send packet.";
                continue;
             }
-            qDebug() << "连接失败：" << client_socket.errorString();
             // 读取文件数据并发送给服务器
             QFile file(liunx_filename);
             try {
