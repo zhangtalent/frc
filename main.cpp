@@ -17,6 +17,8 @@
 #include <QRegularExpression>
 #include <zlib.h>
 #include <QTimer>
+#include <QThread>
+
 
 class FrcApp : public QMainWindow
 {
@@ -84,6 +86,11 @@ public:
     }
 
 private slots:
+    void showMessage(const QString& message)
+    {
+        // 在主线程中显示消息框
+        QMessageBox::information(nullptr, "消息", message);
+    }
     void handle_confirmation(QAbstractButton *button)
     {
         QCoreApplication::quit();
@@ -109,106 +116,7 @@ private slots:
         connect(clientSocket, &QTcpSocket::disconnected, clientSocket, &QTcpSocket::deleteLater);
     }
 
-    void handleReadyRead()
-    {
-        QObject *senderObj = sender();
-        if (!senderObj)
-            return;
-        QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender());
-        if (!clientSocket){
-            return;
-        }
 
-
-        while (clientSocket->bytesAvailable() > 0)
-        {
-
-            QByteArray chunk = clientSocket->read(1024);
-            newData.append(chunk);
-            //qDebug() << "Received data:" << newData;
-            if (receivingFileName)
-            {
-                if(newData.contains("\r\n")){
-
-                    int endIndex = newData.indexOf("\r\n");
-                    QString recData = newData.left(endIndex);
-                    QString filePath = recData.split('|').at(0);
-                    file_size_and_crc_32 = recData.split("|").at(1);
-                    // 提取文件名
-                    filename = QDir::homePath() + "/" + QRegularExpression("[^\\\\/:*?\"<>|\\r\\n]+$").match(filePath).captured();
-    //                qDebug() << filename;
-                   qDebug() << "Received tes:" << newData;
-                    receivingFileName = false;
-                    receivingFileData = true;
-                    newData.clear();
-                    // 打开文件
-                    file.setFileName(filename);
-                    if (!file.open(QIODevice::WriteOnly))
-                    {
-                        qDebug() << "Failed to open file for writing:" << filename;
-                        return;
-                    }
-                }
-
-                //break;
-            } else if (receivingFileData){
-
-                bool ok;
-                quint32 file_size_receive = file_size_and_crc_32.split("*").at(0).toUInt(&ok);
-                if (!ok) {
-//                    qDebug() << "convert_fail:";
-                    // 转换失败的处理逻辑
-                }
-                if(!newData.isEmpty()){
-                    file.write(newData);
-                }
-
-                receivedSize += newData.size();
-                qDebug() << "size" << receivedSize;
-                newData.clear();
-                if(receivedSize >= file_size_receive){
-
-                 file.close();
-                 QString crc_32_receive = file_size_and_crc_32.split("*").at(1);
-                 QString crc_32_file = calculate_crc32(filename).toUpper();
-                 qint64 file_size = get_file_size(filename);
-                 qint64 fileSize = file_size_and_crc_32.split("*").at(0).toUInt();
-//                 qDebug() << crc_32_receive << crc_32_file << file_size << fileSize;
-                 if(file_size != fileSize || crc_32_receive != crc_32_file){
-                     //qDebug() << "File 111:" << filename;
-                     QMessageBox message_box(this);
-                     message_box.setWindowTitle("提示");
-                     message_box.setText(QString("收到文件，已保存到%1,CRC校验失败【%2】").arg(filename, crc_32_file));
-                     //message_box.exec();
-                 } else{
-                     //qDebug() << "File 222:" << filename;
-                     QMessageBox message_box(this);
-                     message_box.setWindowTitle("提示");
-                     message_box.setText(QString("收到文件，已保存到%1,CRC校验通过【%2】").arg(filename, crc_32_file));
-                     //message_box.exec();
-                 }
-                 //qDebug() << "File received and saved:" << filename;
-                 // 关闭当前客户端连接
-//
-                 receivingFileName = true;
-                 receivingFileData = false;
-                 receivingFileOver = true;
-                 break;
-                } else{
-                        qDebug() << "waiting data:" ;
-                }
-                //qDebug() << "Received data:" ;
-            } else {
-            }
-        }
-
-        if(receivingFileOver){
-            clientSocket->close();
-            newData.clear();
-            receivingFileOver = false;
-        }
-
-    }
 
 
 protected:
@@ -451,6 +359,112 @@ private:
             client_socket.disconnectFromHost();
         }
 //        qDebug() << "文件发送完成。";
+    }
+
+
+    void handleReadyRead()
+    {
+        QObject *senderObj = sender();
+        if (!senderObj)
+            return;
+        QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender());
+        if (!clientSocket){
+            return;
+        }
+
+
+        while (clientSocket->bytesAvailable() > 0)
+        {
+
+            QByteArray chunk = clientSocket->read(1024);
+            newData.append(chunk);
+            //qDebug() << "Received data:" << newData;
+            if (receivingFileName)
+            {
+                if(newData.contains("\r\n")){
+
+                    int endIndex = newData.indexOf("\r\n");
+                    QString recData = newData.left(endIndex);
+                    QString filePath = recData.split('|').at(0);
+                    file_size_and_crc_32 = recData.split("|").at(1);
+                    // 提取文件名
+                    filename = QDir::homePath() + "/" + QRegularExpression("[^\\\\/:*?\"<>|\\r\\n]+$").match(filePath).captured();
+    //                qDebug() << filename;
+                   //qDebug() << "Received tes:" << newData;
+                    receivingFileName = false;
+                    receivingFileData = true;
+                    newData.clear();
+                    // 打开文件
+                    file.setFileName(filename);
+                    if (!file.open(QIODevice::WriteOnly))
+                    {
+                        qDebug() << "Failed to open file for writing:" << filename;
+                        return;
+                    }
+                }
+
+                //break;
+            } else if (receivingFileData){
+
+                bool ok;
+                quint32 file_size_receive = file_size_and_crc_32.split("*").at(0).toUInt(&ok);
+                if (!ok) {
+//                    qDebug() << "convert_fail:";
+                    // 转换失败的处理逻辑
+                }
+                if(!newData.isEmpty()){
+                    file.write(newData);
+                }
+
+                receivedSize += newData.size();
+                //qDebug() << "size" << receivedSize;
+                newData.clear();
+                if(receivedSize >= file_size_receive){
+
+                 file.close();
+                 QString crc_32_receive = file_size_and_crc_32.split("*").at(1);
+                 QString crc_32_file = calculate_crc32(filename).toUpper();
+                 qint64 file_size = get_file_size(filename);
+                 qint64 fileSize = file_size_and_crc_32.split("*").at(0).toUInt();
+//                 qDebug() << crc_32_receive << crc_32_file << file_size << fileSize;
+                 if(file_size != fileSize || crc_32_receive != crc_32_file){
+                     //qDebug() << "File 111:" << filename;
+                     showMessage(QString("收到文件，已保存到%1,CRC校验失败【%2】").arg(filename, crc_32_file));
+                     QMessageBox message_box(this);
+                     message_box.setWindowTitle("提示");
+
+                     message_box.setText(QString("收到文件，已保存到%1,CRC校验失败【%2】").arg(filename, crc_32_file));
+                     //message_box.exec();
+                 } else{
+                     //qDebug() << "File 222:" << filename;
+                     showMessage(QString("收到文件，已保存到%1,CRC校验通过【%2】").arg(filename, crc_32_file));
+                     QMessageBox message_box(this);
+                     message_box.setWindowTitle("提示");
+                     message_box.setText(QString("收到文件，已保存到%1,CRC校验通过【%2】").arg(filename, crc_32_file));
+                     //message_box.exec();
+                 }
+                 //qDebug() << "File received and saved:" << filename;
+                 // 关闭当前客户端连接
+//
+                 receivingFileName = true;
+                 receivingFileData = false;
+                 receivingFileOver = true;
+                 receivedSize=0;
+                 break;
+                } else{
+                        //qDebug() << "waiting data:" ;
+                }
+                //qDebug() << "Received data:" ;
+            } else {
+            }
+        }
+
+        if(receivingFileOver){
+            newData.clear();
+            receivedSize=0;
+            receivingFileOver = false;
+        }
+
     }
 
     QString calculate_crc32(const QString& file_path)
