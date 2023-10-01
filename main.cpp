@@ -18,6 +18,7 @@
 #include <zlib.h>
 #include <QTimer>
 #include <QThread>
+#include <QTextCodec>
 
 
 class FrcApp : public QMainWindow
@@ -376,20 +377,25 @@ private:
         while (clientSocket->bytesAvailable() > 0)
         {
 
-            QByteArray chunk = clientSocket->read(1024);
-            newData.append(chunk);
+
             //qDebug() << "Received data:" << newData;
             if (receivingFileName)
             {
-                if(newData.contains("\r\n")){
+                QByteArray chunk = clientSocket->readLine(1024);
+                newData.append(chunk);
+                QTextCodec* codec = QTextCodec::codecForName("GBK");
+                QString decodedString = codec->toUnicode(newData);
+                //qDebug() << newData << decodedString;
+                if(decodedString.contains("\r\n")){
 
-                    int endIndex = newData.indexOf("\r\n");
-                    QString recData = newData.left(endIndex);
+                    int endIndex = decodedString.indexOf("\r\n");
+                    QString recData = decodedString.left(endIndex);
                     QString filePath = recData.split('|').at(0);
                     file_size_and_crc_32 = recData.split("|").at(1);
                     // 提取文件名
                     filename = QDir::homePath() + "/" + QRegularExpression("[^\\\\/:*?\"<>|\\r\\n]+$").match(filePath).captured();
-    //                qDebug() << filename;
+                    //filename = filename
+                    //qDebug() << filename;
                    //qDebug() << "Received tes:" << newData;
                     receivingFileName = false;
                     receivingFileData = true;
@@ -405,7 +411,8 @@ private:
 
                 //break;
             } else if (receivingFileData){
-
+                QByteArray chunk = clientSocket->readAll();
+                newData.append(chunk);
                 bool ok;
                 quint32 file_size_receive = file_size_and_crc_32.split("*").at(0).toUInt(&ok);
                 if (!ok) {
@@ -429,18 +436,11 @@ private:
 //                 qDebug() << crc_32_receive << crc_32_file << file_size << fileSize;
                  if(file_size != fileSize || crc_32_receive != crc_32_file){
                      //qDebug() << "File 111:" << filename;
-                     showMessage(QString("收到文件，已保存到%1,CRC校验失败【%2】").arg(filename, crc_32_file));
-                     QMessageBox message_box(this);
-                     message_box.setWindowTitle("提示");
-
-                     message_box.setText(QString("收到文件，已保存到%1,CRC校验失败【%2】").arg(filename, crc_32_file));
+                     //showMessage(QString("收到文件，已保存到%1,CRC校验失败【%2】").arg(filename, crc_32_file));
                      //message_box.exec();
                  } else{
                      //qDebug() << "File 222:" << filename;
-                     showMessage(QString("收到文件，已保存到%1,CRC校验通过【%2】").arg(filename, crc_32_file));
-                     QMessageBox message_box(this);
-                     message_box.setWindowTitle("提示");
-                     message_box.setText(QString("收到文件，已保存到%1,CRC校验通过【%2】").arg(filename, crc_32_file));
+                     //showMessage(QString("收到文件，已保存到%1,CRC校验通过【%2】").arg(filename, crc_32_file));
                      //message_box.exec();
                  }
                  //qDebug() << "File received and saved:" << filename;
@@ -460,7 +460,6 @@ private:
         }
 
         if(receivingFileOver){
-            newData.clear();
             receivedSize=0;
             receivingFileOver = false;
         }
