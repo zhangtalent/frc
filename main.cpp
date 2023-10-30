@@ -99,6 +99,8 @@ private slots:
     void sendUdpMessage()
     {
         if(server_ip!=""){
+            //qDebug() << ("ff" + server_ip);
+            //绑定到服务器
             QByteArray message = QString("5%1*%2*%3").arg(server_ip, "", QDir::homePath() + "/").toUtf8();
             udpSocket.writeDatagram(message, QHostAddress(group_ip), port);
             timer.stop();
@@ -265,12 +267,13 @@ private:
             }
             else if (code == "2" && ip_addr == get_local_ip())
             {
-//                qDebug() << "2";
+                //qDebug() << "2";
                 QByteArray message = QString("3%1").arg(server_ip).toUtf8();
                 udpSocket.writeDatagram(message, QHostAddress(group_ip), port);
             }
             else if (code == "B" && ip_addr == get_local_ip()) {
-               // 处理字符串变成path_list
+               //qDebug() << "B" << datagram ;
+                // 处理字符串变成path_list
                QStringList path_data = QString(datagram).split("*");
                QStringList file_paths;
                for (int i = 2; i < path_data.size(); ++i) {
@@ -307,12 +310,13 @@ private:
             QNetworkProxy::ProxyType proxyType = QNetworkProxy::NoProxy; // 替换为所需的代理类型
             client_socket.setProxy(proxyType);
             client_socket.connectToHost(server_ip, server_port);
+            //tcp连接等待及等待传输等待皆为5s，出问题就断开tcp链接
             if (!client_socket.waitForConnected(5000)) {
                 // 连接失败的处理
                 // 连接失败的处理
-//                qDebug() << "连接失败：" << client_socket.errorString();
+                //qDebug() << "连接失败：" << client_socket.errorString();
                 client_socket.disconnectFromHost();
-                QThread::sleep(1);
+                //QThread::sleep(1);
                 continue;
             }
             QString linux_path = file_path;
@@ -323,7 +327,7 @@ private:
             bool exists = QFile::exists(liunx_filename);
             if (!exists) {
                 client_socket.disconnectFromHost();
-                QThread::sleep(1);
+                //QThread::sleep(1);
                 continue;
             }
             qint64 file_size = get_file_size(liunx_filename);
@@ -336,9 +340,9 @@ private:
             client_socket.write(message.toUtf8());
             if (!client_socket.waitForBytesWritten(5000))
             {
-//               qDebug() << "Failed to send packet.";
+               //qDebug() << "Failed to send packet.";
               client_socket.disconnectFromHost();
-              QThread::sleep(1);
+              //QThread::sleep(1);
               continue;
             }
             // 读取文件数据并发送给服务器
@@ -353,7 +357,7 @@ private:
                         client_socket.write(data);
                         if (!client_socket.waitForBytesWritten(5000))
                        {
-//                           qDebug() << "Failed to send packet.";
+                           //qDebug() << "Failed to send packet.1";
                           break;
                        }
                     }
@@ -365,7 +369,7 @@ private:
 
             // 关闭连接
             client_socket.disconnectFromHost();
-            QThread::sleep(1);
+            //QThread::sleep(1);
         }
 //        qDebug() << "文件发送完成。";
     }
@@ -412,7 +416,7 @@ private:
                     file.setFileName(filename);
                     if (!file.open(QIODevice::WriteOnly))
                     {
-                        qDebug() << "Failed to open file for writing:" << filename;
+                        //qDebug() << "Failed to open file for writing:" << filename;
                         return;
                     }
                 }
