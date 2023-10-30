@@ -99,6 +99,8 @@ private slots:
     void sendUdpMessage()
     {
         if(server_ip!=""){
+            QByteArray message = QString("5%1*%2*%3").arg(server_ip, "", QDir::homePath() + "/").toUtf8();
+            udpSocket.writeDatagram(message, QHostAddress(group_ip), port);
             timer.stop();
             return;
         }
@@ -305,10 +307,12 @@ private:
             QNetworkProxy::ProxyType proxyType = QNetworkProxy::NoProxy; // 替换为所需的代理类型
             client_socket.setProxy(proxyType);
             client_socket.connectToHost(server_ip, server_port);
-            if (!client_socket.waitForConnected()) {
+            if (!client_socket.waitForConnected(5000)) {
                 // 连接失败的处理
                 // 连接失败的处理
 //                qDebug() << "连接失败：" << client_socket.errorString();
+                client_socket.disconnectFromHost();
+                QThread::sleep(1);
                 continue;
             }
             QString linux_path = file_path;
@@ -318,6 +322,8 @@ private:
             QString windows_filename = dictory + "\\" + user_code + "\\" + windows_path;
             bool exists = QFile::exists(liunx_filename);
             if (!exists) {
+                client_socket.disconnectFromHost();
+                QThread::sleep(1);
                 continue;
             }
             qint64 file_size = get_file_size(liunx_filename);
@@ -328,10 +334,12 @@ private:
             QString message = QString("/%1/%2|%3%4\r\n").arg(user_code).arg(file_path).arg(file_size).arg(hex_string);
 
             client_socket.write(message.toUtf8());
-            if (!client_socket.waitForBytesWritten())
+            if (!client_socket.waitForBytesWritten(5000))
             {
 //               qDebug() << "Failed to send packet.";
-               continue;
+              client_socket.disconnectFromHost();
+              QThread::sleep(1);
+              continue;
             }
             // 读取文件数据并发送给服务器
             QFile file(liunx_filename);
@@ -343,14 +351,13 @@ private:
                         QByteArray data = file.readAll();
 //                        qDebug() << data;
                         client_socket.write(data);
-                        if (!client_socket.waitForBytesWritten())
+                        if (!client_socket.waitForBytesWritten(5000))
                        {
 //                           qDebug() << "Failed to send packet.";
-                           continue;
+                          break;
                        }
                     }
                     // 文件打开成功，可以在这里执行读取操作或其他操作
-
                     file.close();
                 } catch (const QString& error) {
 //                    qDebug() << "Error: " << error;
@@ -358,6 +365,7 @@ private:
 
             // 关闭连接
             client_socket.disconnectFromHost();
+            QThread::sleep(1);
         }
 //        qDebug() << "文件发送完成。";
     }
